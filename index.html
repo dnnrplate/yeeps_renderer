@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yeeps Cosmetic Loadout Sandbox</title>
+    <script type="module" src="https://googleapis.com"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; height: 100vh; background: #121212; color: #fff; }
+        #sidebar { width: 320px; background: #1a1a1a; padding: 20px; overflow-y: auto; border-right: 2px solid #333; }
+        #viewer-container { flex: 1; position: relative; }
+        model-viewer { width: 100%; height: 100%; }
+        h3 { margin-top: 0; color: #a855f7; border-bottom: 2px solid #333; padding-bottom: 10px; text-transform: uppercase; font-size: 18px; letter-spacing: 1px; }
+        .category-block { margin-bottom: 15px; background: #242424; border-radius: 6px; padding: 10px; border: 1px solid #333; }
+        .category-title { margin: 0 0 10px 0; color: #c084fc; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid #444; padding-bottom: 5px; font-weight: bold; }
+        .toggle-item { display: flex; align-items: center; margin: 8px 0; font-size: 13px; cursor: pointer; color: #ddd; text-transform: capitalize; }
+        .toggle-item:hover { color: #fff; }
+        .toggle-item input { margin-right: 10px; accent-color: #a855f7; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h3>Yeeps Wardrobe</h3>
+        <div id="controls-list">Sorting mass cosmetics dynamically...</div>
+    </div>
+
+    <div id="viewer-container">
+        <!-- Make sure your exported .glb file name matches this 'src' exactly -->
+        <model-viewer id="yeepSandbox" src="virtually_milo_yeep_1.glb" camera-controls shadow-intensity="1" interaction-prompt="none">
+        </model-viewer>
+    </div>
+
+    <script>
+        const modelViewer = document.querySelector('#yeepSandbox');
+        const controlsList = document.querySelector('#controls-list');
+
+        modelViewer.addEventListener('load', () => {
+            controlsList.innerHTML = ''; // Wipe loading message
+            
+            const scene = modelViewer.model.coreObject;
+            
+            scene.traverse((node) => {
+                if (node.isMesh) {
+                    // Force the hidden cosmetic state on page load
+                    node.visible = false;
+
+                    // DEFINE CATEGORIES AUTOMATICALLY BY READING THE TEXT NAME
+                    let categoryName = "Other Accessories";
+                    
+                    const nameLower = node.name.toLowerCase();
+                    if (nameLower.includes("hair")) categoryName = "Hair Styles";
+                    else if (nameLower.includes("hat")) categoryName = "Hats & Helmets";
+                    else if (nameLower.includes("shirt") || nameLower.includes("torso")) categoryName = "Shirts & Tops";
+                    else if (nameLower.includes("over")) categoryName = "Over-Layers";
+                    else if (nameLower.includes("zipper")) categoryName = "Zippers";
+                    else if (nameLower.includes("badge")) categoryName = "Badges & Pins";
+
+                    // Automatically build a clean visual container box if it doesn't exist yet
+                    let categoryBlock = document.getElementById(`block-${categoryName.replace(/\s+/g, '')}`);
+                    if (!categoryBlock) {
+                        categoryBlock = document.createElement('div');
+                        categoryBlock.id = `block-${categoryName.replace(/\s+/g, '')}`;
+                        categoryBlock.className = 'category-block';
+                        
+                        const title = document.createElement('h4');
+                        title.className = 'category-title';
+                        title.textContent = categoryName;
+                        
+                        categoryBlock.appendChild(title);
+                        controlsList.appendChild(categoryBlock);
+                    }
+
+                    // Build individual checkbox
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'toggle-item';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `toggle-${node.name}`;
+                    
+                    const label = document.createElement('label');
+                    label.htmlFor = checkbox.id;
+                    
+                    // Scrub underscores out of item names so they look clean for players
+                    label.textContent = node.name.replace(/cosmetic_/g, '').replace(/_/g, ' ');
+
+                    checkbox.addEventListener('change', (e) => {
+                        node.visible = e.target.checked;
+                        modelViewer.queueRender(); // Instantly update browser render frame
+                    });
+
+                    wrapper.appendChild(checkbox);
+                    wrapper.appendChild(label);
+                    categoryBlock.appendChild(wrapper);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
