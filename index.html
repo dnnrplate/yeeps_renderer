@@ -4,81 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yeeps Cosmetic Loadout Sandbox</title>
-    <!-- Using version 3.4.0 which fully allows script access to the core model meshes -->
+    <!-- Import a fresh model-viewer build that features an open public model API -->
     <script type="module" src="https://googleapis.com"></script>
     <style>
         body { 
-            margin: 0; 
-            padding: 0; 
+            margin: 0; padding: 0; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            display: flex; 
-            height: 100vh; 
-            background: #0f0f12; 
-            color: #f3f4f6; 
-            overflow: hidden;
+            display: flex; height: 100vh; background: #0f0f12; color: #f3f4f6; overflow: hidden;
         }
         #sidebar { 
-            width: 320px; 
-            background: #18181c; 
-            padding: 24px; 
-            overflow-y: auto; 
-            border-right: 1px solid #2e2e38;
-            box-shadow: 4px 0 15px rgba(0,0,0,0.3);
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
+            width: 320px; background: #18181c; padding: 24px; overflow-y: auto; 
+            border-right: 1px solid #2e2e38; box-shadow: 4px 0 15px rgba(0,0,0,0.3);
+            z-index: 10; display: flex; flex-direction: column;
         }
         h3 { 
-            margin-top: 0; 
-            color: #c084fc; 
-            border-bottom: 2px solid #2e2e38; 
-            padding-bottom: 12px; 
-            text-transform: uppercase; 
-            font-size: 18px; 
-            letter-spacing: 1.5px;
-            margin-bottom: 20px;
+            margin-top: 0; color: #c084fc; border-bottom: 2px solid #2e2e38; 
+            padding-bottom: 12px; text-transform: uppercase; font-size: 18px; 
+            letter-spacing: 1.5px; margin-bottom: 20px;
         }
         #controls-list { flex: 1; }
         .category-block { 
-            margin-bottom: 20px; 
-            background: #202026; 
-            border-radius: 8px; 
-            padding: 14px; 
-            border: 1px solid #2e2e38; 
+            margin-bottom: 20px; background: #202026; border-radius: 8px; 
+            padding: 14px; border: 1px solid #2e2e38; 
         }
         .category-title { 
-            margin: 0 0 12px 0; 
-            color: #e9d5ff; 
-            font-size: 13px; 
-            text-transform: uppercase; 
-            border-bottom: 1px solid #3b3b4f; 
-            padding-bottom: 6px; 
-            font-weight: 700; 
+            margin: 0 0 12px 0; color: #e9d5ff; font-size: 13px; 
+            text-transform: uppercase; border-bottom: 1px solid #3b3b4f; 
+            padding-bottom: 6px; font-weight: 700; 
         }
         .toggle-item { 
-            display: flex; 
-            align-items: center; 
-            margin: 10px 0; 
-            font-size: 14px; 
-            cursor: pointer; 
-            color: #d1d5db; 
-            text-transform: capitalize;
+            display: flex; align-items: center; margin: 10px 0; font-size: 14px; 
+            cursor: pointer; color: #d1d5db; text-transform: capitalize;
             transition: color 0.2s ease, transform 0.1s ease;
         }
-        .toggle-item:hover { 
-            color: #ffffff; 
-            transform: translateX(2px);
-        }
+        .toggle-item:hover { color: #ffffff; transform: translateX(2px); }
         .toggle-item input { 
-            margin-right: 12px; 
-            accent-color: #a855f7; 
-            cursor: pointer; 
-            width: 16px;
-            height: 16px;
+            margin-right: 12px; accent-color: #a855f7; cursor: pointer; 
+            width: 16px; height: 16px;
         }
         #viewer-container { 
-            flex: 1; 
-            position: relative; 
+            flex: 1; position: relative; 
             background: radial-gradient(circle at center, #1e1e24 0%, #09090b 100%);
         }
         model-viewer { width: 100%; height: 100%; --poster-color: transparent; }
@@ -90,7 +55,7 @@
     <div id="sidebar">
         <h3>Yeeps Wardrobe</h3>
         <div id="controls-list">
-            <div class="status-msg">Analyzing compressed asset maps...</div>
+            <div class="status-msg">Assembling wardrobe layers...</div>
         </div>
     </div>
 
@@ -113,44 +78,35 @@
         modelViewer.addEventListener('load', () => {
             controlsList.innerHTML = ''; 
             
-            // Accessing symbols directly to bypass API security locks on custom compressed files
-            const symbols = Object.getOwnPropertySymbols(modelViewer);
-            const sceneSymbol = symbols.find(s => s.description === 'scene');
-            const scene = sceneSymbol ? modelViewer[sceneSymbol] : null;
-            
-            if (!scene) {
-                controlsList.innerHTML = '<div class="status-msg" style="color:#f87171;">Error: Direct 3D access layer blocked.</div>';
+            // Using the official, updated public method to safely extract the model data 
+            const modelInstance = modelViewer.model;
+            if (!modelInstance) {
+                controlsList.innerHTML = '<div class="status-msg" style="color:#f87171;">Error: Unable to map model structure.</div>';
                 return;
             }
 
-            let itemsFound = 0;
+            let discoveredItemsCount = 0;
 
-            scene.traverse((node) => {
-                if (node) {
-                    const nodeName = node.name ? String(node.name) : '';
-                    const nameLower = nodeName.toLowerCase();
+            // Loop through the materials directly to find clothing meshes instead of drilling nodes
+            modelInstance.materials.forEach((material) => {
+                if (material && material.name) {
+                    const matName = String(material.name).toLowerCase();
                     
-                    if (!nodeName || nameLower.includes("armature") || nameLower.includes("root") || nameLower.includes("bone") || nodeName === "Scene") {
+                    // Ignore skin and background textures
+                    if (matName.includes("body") || matName.includes("skin") || matName.includes("monkey")) {
                         return;
                     }
 
-                    // Leave base body models skin tracking always ON
-                    if (nameLower.includes("body") && !nameLower.includes("shirt") && !nameLower.includes("cosmetic")) {
-                        node.visible = true; 
-                        return; 
-                    }
+                    discoveredItemsCount++;
 
-                    // Turn off apparel options on page load
-                    node.visible = false;
-                    itemsFound++;
-
+                    // Dynamically categorize the items
                     let targetCategory = "Other Accessories";
-                    if (nameLower.includes("hair")) targetCategory = "Hair Styles";
-                    else if (nameLower.includes("hat") || nameLower.includes("helm") || nameLower.includes("cap")) targetCategory = "Hats & Helmets";
-                    else if (nameLower.includes("shirt") || nameLower.includes("torso") || nameLower.includes("jacket")) targetCategory = "Shirts & Tops";
-                    else if (nameLower.includes("over")) targetCategory = "Over-Layers";
-                    else if (nameLower.includes("zipper")) targetCategory = "Zippers";
-                    else if (nameLower.includes("badge") || nameLower.includes("pin")) targetCategory = "Badges & Pins";
+                    if (matName.includes("hair")) targetCategory = "Hair Styles";
+                    else if (matName.includes("hat") || matName.includes("helm")) targetCategory = "Hats & Helmets";
+                    else if (matName.includes("shirt") || matName.includes("torso")) targetCategory = "Shirts & Tops";
+                    else if (matName.includes("over")) targetCategory = "Over-Layers";
+                    else if (matName.includes("zipper")) targetCategory = "Zippers";
+                    else if (matName.includes("badge")) targetCategory = "Badges & Pins";
 
                     const safeBlockId = `block-${targetCategory.replace(/\s+/g, '')}`;
                     let categoryBlock = document.getElementById(safeBlockId);
@@ -168,31 +124,32 @@
                         controlsList.appendChild(categoryBlock);
                     }
 
-                    let cleanPresentationName = nodeName
-                        .replace(/cosmetic_/gi, '')
-                        .replace(/layer/gi, '')
-                        .replace(/_/g, ' ')
-                        .trim();
-
-                    if (!cleanPresentationName) cleanPresentationName = `Cosmetic Asset #${itemsFound}`;
+                    let cleanName = material.name.replace(/cosmetic_/gi, '').replace(/_/g, ' ').trim();
 
                     const itemWrapper = document.createElement('div');
                     itemWrapper.className = 'toggle-item';
                     
                     const itemCheckbox = document.createElement('input');
                     itemCheckbox.type = 'checkbox';
-                    itemCheckbox.id = `box-${itemsFound}`;
+                    itemCheckbox.id = `mat-${discoveredItemsCount}`;
                     
+                    // We start items hidden by setting their transparency/alpha option to invisible on load
+                    material.setAlphaMode("BLEND");
+                    material.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 0]); 
+
                     const itemLabel = document.createElement('label');
                     itemLabel.htmlFor = itemCheckbox.id;
-                    itemLabel.textContent = cleanPresentationName;
+                    itemLabel.textContent = cleanName;
 
+                    // Toggle handler: checking the box swaps the texture color alpha channel between 0 and 1
                     itemCheckbox.addEventListener('change', (e) => {
-                        node.visible = e.target.checked;
-                        if (node.traverse) {
-                            node.traverse((child) => { if(child) child.visible = e.target.checked; });
+                        if (e.target.checked) {
+                            material.setAlphaMode("OPAQUE");
+                            material.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+                        } else {
+                            material.setAlphaMode("BLEND");
+                            material.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 0]);
                         }
-                        modelViewer.queueRender();
                     });
 
                     itemWrapper.appendChild(itemCheckbox);
@@ -201,8 +158,8 @@
                 }
             });
 
-            if (itemsFound === 0) {
-                controlsList.innerHTML = '<div class="status-msg" style="color:#f59e0b;">Warning: Opened 3D space but found 0 components. Ensure your mesh nodes have unique names.</div>';
+            if (discoveredItemsCount === 0) {
+                controlsList.innerHTML = '<div class="status-msg" style="color:#f59e0b;">Warning: Sandbox generated but zero custom apparel mappings were found inside the model data.</div>';
             }
         });
     </script>
