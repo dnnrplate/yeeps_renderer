@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yeeps Cosmetic Loadout Sandbox</title>
+    <!-- Using version 3.4.0 which fully allows script access to the core model meshes -->
     <script type="module" src="https://googleapis.com"></script>
     <style>
         body { 
@@ -112,40 +113,41 @@
         modelViewer.addEventListener('load', () => {
             controlsList.innerHTML = ''; 
             
-            const scene = modelViewer.model ? modelViewer.model.coreObject : null;
+            // Accessing symbols directly to bypass API security locks on custom compressed files
+            const symbols = Object.getOwnPropertySymbols(modelViewer);
+            const sceneSymbol = symbols.find(s => s.description === 'scene');
+            const scene = sceneSymbol ? modelViewer[sceneSymbol] : null;
+            
             if (!scene) {
-                controlsList.innerHTML = '<div class="status-msg" style="color:#f87171;">Fatal: Couldn\'t load structural core of your GLB file.</div>';
+                controlsList.innerHTML = '<div class="status-msg" style="color:#f87171;">Error: Direct 3D access layer blocked.</div>';
                 return;
             }
 
-            let discoveredItemsCount = 0;
+            let itemsFound = 0;
 
             scene.traverse((node) => {
-                if (node.isMesh || node.type === "Object3D" || node.type === "SkinnedMesh") {
-                    const nameLower = node.name.toLowerCase();
+                if (node) {
+                    const nodeName = node.name ? String(node.name) : '';
+                    const nameLower = nodeName.toLowerCase();
                     
-                    if (
-                        nameLower.includes("armature") || 
-                        nameLower.includes("root") || 
-                        nameLower.includes("bone") || 
-                        nameLower.includes("rig") ||
-                        node.name === "Scene"
-                    ) {
+                    if (!nodeName || nameLower.includes("armature") || nameLower.includes("root") || nameLower.includes("bone") || nodeName === "Scene") {
                         return;
                     }
 
+                    // Leave base body models skin tracking always ON
                     if (nameLower.includes("body") && !nameLower.includes("shirt") && !nameLower.includes("cosmetic")) {
                         node.visible = true; 
                         return; 
                     }
 
+                    // Turn off apparel options on page load
                     node.visible = false;
-                    discoveredItemsCount++;
+                    itemsFound++;
 
                     let targetCategory = "Other Accessories";
                     if (nameLower.includes("hair")) targetCategory = "Hair Styles";
                     else if (nameLower.includes("hat") || nameLower.includes("helm") || nameLower.includes("cap")) targetCategory = "Hats & Helmets";
-                    else if (nameLower.includes("shirt") || nameLower.includes("torso") || nameLower.includes("jacket") || nameLower.includes("coat")) targetCategory = "Shirts & Tops";
+                    else if (nameLower.includes("shirt") || nameLower.includes("torso") || nameLower.includes("jacket")) targetCategory = "Shirts & Tops";
                     else if (nameLower.includes("over")) targetCategory = "Over-Layers";
                     else if (nameLower.includes("zipper")) targetCategory = "Zippers";
                     else if (nameLower.includes("badge") || nameLower.includes("pin")) targetCategory = "Badges & Pins";
@@ -166,33 +168,29 @@
                         controlsList.appendChild(categoryBlock);
                     }
 
-                    let cleanPresentationName = node.name
+                    let cleanPresentationName = nodeName
                         .replace(/cosmetic_/gi, '')
                         .replace(/layer/gi, '')
                         .replace(/_/g, ' ')
                         .trim();
 
-                    if (!cleanPresentationName) {
-                        cleanPresentationName = `Cosmetic Gear #${discoveredItemsCount}`;
-                    }
+                    if (!cleanPresentationName) cleanPresentationName = `Cosmetic Asset #${itemsFound}`;
 
                     const itemWrapper = document.createElement('div');
                     itemWrapper.className = 'toggle-item';
                     
                     const itemCheckbox = document.createElement('input');
                     itemCheckbox.type = 'checkbox';
-                    itemCheckbox.id = `checkbox-node-${node.id || Math.random().toString(36).substr(2, 9)}`;
+                    itemCheckbox.id = `box-${itemsFound}`;
                     
                     const itemLabel = document.createElement('label');
                     itemLabel.htmlFor = itemCheckbox.id;
                     itemLabel.textContent = cleanPresentationName;
 
-                    itemCheckbox.addEventListener('change', (event) => {
-                        node.visible = event.target.checked;
-                        if (node.children && node.children.length > 0) {
-                            node.traverse((childNode) => {
-                                childNode.visible = event.target.checked;
-                            });
+                    itemCheckbox.addEventListener('change', (e) => {
+                        node.visible = e.target.checked;
+                        if (node.traverse) {
+                            node.traverse((child) => { if(child) child.visible = e.target.checked; });
                         }
                         modelViewer.queueRender();
                     });
@@ -203,8 +201,8 @@
                 }
             });
 
-            if (discoveredItemsCount === 0) {
-                controlsList.innerHTML = '<div class="status-msg" style="color:#f59e0b;">Warning: 3D data parsed successfully, but zero toggleable items were found.</div>';
+            if (itemsFound === 0) {
+                controlsList.innerHTML = '<div class="status-msg" style="color:#f59e0b;">Warning: Opened 3D space but found 0 components. Ensure your mesh nodes have unique names.</div>';
             }
         });
     </script>
